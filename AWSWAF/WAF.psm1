@@ -1,10 +1,7 @@
 ﻿function createWAF(){
     
     Param(
-        
-        #Codes for countries - 'Iran - IR','Korea - KR','Russian - RU'
         [Parameter(Mandatory=$true)]
-        [ValidateSet('IR','KR','RU')]
         [string] $GeoMatch_country_blocked,
         
         #IPV4 address if IPV^ change in code.
@@ -27,7 +24,7 @@
     )
 
     #Test
-    #$GeoMatch_country_blocked = 'IR'
+    #$GeoMatch_country_blocked = 'IN'
     #$ip_blocked = '192.0.2.0/24'
     #$GeoMatch_Name = 'Demot2'
     #$Ip_Name = 'Demot2'
@@ -143,17 +140,17 @@
 
     $WebACL_setupdate1 = New-Object -TypeName Amazon.WAF.Model.WebACLUpdate
 	
-	$WebACL_setupdate1.Action = "Insert"
+    $WebACL_setupdate1.Action = "Insert"
 
     $WebACL_setupdate1.ActivatedRule = $Rule1
         
     $WebACL_setupdate2 = New-Object -TypeName Amazon.WAF.Model.WebACLUpdate
 
-	$WebACL_setupdate2.Action = "Insert"
+    $WebACL_setupdate2.Action = "Insert"
 
     $WebACL_setupdate2.ActivatedRule = $Rule2
 
-	Update-WAFWebACL -ChangeToken (Get-WAFChangeToken) -Update $WebACL_setupdate1 -WebACLId $WAFACL_ID
+    Update-WAFWebACL -ChangeToken (Get-WAFChangeToken) -Update $WebACL_setupdate1 -WebACLId $WAFACL_ID
 
     Update-WAFWebACL -ChangeToken (Get-WAFChangeToken) -Update $WebACL_setupdate2 -WebACLId $WAFACL_ID
     
