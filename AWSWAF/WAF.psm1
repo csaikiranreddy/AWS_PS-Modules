@@ -1,86 +1,120 @@
-﻿function createWAF(){
+$Instances_All = (Get-EC2Instance -Region $Region).Instances
+$Loadbalancers = Get-ELB2LoadBalancer
+
+$Accounts_classic = @()
+$Accounts_Application = @()
+$Accounts_network = @()
+
+if ($Instances_All.count -gt 0){
+    foreach ( $LB in $LoadBalancers ) { 
+        if($LB.Type.Value -eq 'application'){
+            $Accounts_Application+=$LB
+            }
+        elseif($LB.Type.Value -eq 'classic'){
+            $Accounts_classic+=$LB
+            }
+        elseif($LB.Type.Value -eq 'network'){
+            $Accounts_network+=$LB
+            }          
+}}
+
+
+$Accounts = @()
+foreach ( $LB in $LoadBalancers ) { 
+    $new = New-Object -TypeName psobject 
+        $new | Add-Member -MemberType NoteProperty -Name 'LoadBalancer' -Value $LB.LoadBalancerName
+        $new | Add-Member -MemberType NoteProperty -Type 'LoadBalancer' -Value $LB.Type.Value
+    $Accounts += $new
+}
+$Accounts
+
+
+
+
+
+$Region = 'us-east-2'
+
+Initialize-AWSDefaultConfiguration -Region $Region
+
+$GeoMatch_Name = 'Demot'
+$Ip_Name = 'Demot'
+$Rule_Location = 'Demoloct'
+$Rule_Ip = "Demoipt"
+$WebACL_Name = 'Demot'
+$Default_Value = 'Demot'
+
+if ($Instances_All.count -gt 0){
     
-    Param(
-        [Parameter(Mandatory=$true)]
-        [string] $GeoMatch_country_blocked,
-        
-        #IPV4 address if IPV^ change in code.
-        [Parameter(Mandatory=$true)]
-        [string] $ip_blocked,
-        
-        [Parameter(Mandatory=$true)]
-        [string] $GeoMatch_Name,
-        
-        [Parameter(Mandatory=$true)]
-        [string] $Ip_Name,
-       
-        [Parameter(Mandatory=$true)]
-        [string] $Rule_Name,
-        [Parameter(Mandatory=$true)]
-        
-        [string] $WebACL_Name,
-        [Parameter(Mandatory=$true)]
-        [string] $Default_Value
-    )
+    #GeoMatch
+    #Countries blocked
 
-    #Test
-    #$GeoMatch_country_blocked = 'IN'
-    #$ip_blocked = '192.0.2.0/24'
-    #$GeoMatch_Name = 'Demot2'
-    #$Ip_Name = 'Demot2'
-    #$Rule_Location = 'Demoloct2'
-    #$Rule_Ip = "Demoipt2"
-    #$WebACL_Name = 'Demot2'
-    #$Default_Value = 'Demot2'
+    $GeoMatch_country_blocked = @([pscustomobject]@{Country='IR'},[pscustomobject]@{Country='SD'},[pscustomobject]@{Country='SY'},[pscustomobject]@{Country='KP'},[pscustomobject]@{Country='CU'})
+
+    $GeoMatchset_ID = (New-WAFRGeoMatchSet -ChangeToken (Get-WAFRChangeToken) -Name $GeoMatch_Name -Region $Region).GeoMatchSet.GeoMatchSetId
+
+    foreach ( $GCB in $GeoMatch_country_blocked ) { 
+    
+        $GeoMatch_Constraint = New-Object -TypeName Amazon.WAFRegional.Model.GeoMatchConstraint
+
+        $GeoMatch_Constraint.Type = "Country"
+
+        $GeoMatch_Constraint.Value = $GCB.Country
+
+        $GeoMatch_Setupdate = New-Object -TypeName Amazon.WAFRegional.Model.GeoMatchSetUpdate
+
+        $GeoMatch_Setupdate.Action = "Insert"
+
+        $GeoMatch_Setupdate.GeoMatchConstraint = $GeoMatch_Constraint
+
+        Update-WAFRGeoMatchSet -ChangeToken (Get-WAFRChangeToken) -GeoMatchSetId $GeoMatchset_ID -Update $GeoMatch_Setupdate
+    }
+
+   
+    #Ip
+    #IP's Blocked
+    
+    #$ip_blocked = @([pscustomobject]@{CIDR = '5.59.38.0/23'},[pscustomobject]@{CIDR = '31.28.224.0/19'},[pscustomobject]@{CIDR = '91.235.12.0/22'})
+
+    $ip_blocked = @()
+
+    $Path = "C:\Users\sai 9639\Documents\RegionofCrimea.csv"
+    $IP = Import-Csv -Path $Path
+    foreach ( $row in $IP ) {
+        $new = New-Object -TypeName psobject
+            $new | Add-Member -MemberType NoteProperty -Name 'CIDR' -Value $row.name
+        $ip_blocked += $new
+    }
+    
+    $Ipset_ID = (New-WAFRIPSet -ChangeToken (Get-WAFRChangeToken) -Name $Ip_Name).IPSet.IPSetId
+   
+    foreach($IP in $ip_blocked){
+
+        $IPSet_Descriptor = New-Object -TypeName Amazon.WAFRegional.Model.IPSetDescriptor
+
+        $IPSet_Descriptor.Type = "IPV4"
+
+        $IPSet_Descriptor.Value = $IP.CIDR
+
+        $IPSet_setUpdate = New-Object -TypeName Amazon.WAFRegional.Model.IPSetUpdate
+
+        $IPSet_setUpdate.Action = "Insert"
+
+        $IPSet_setUpdate.IPSetDescriptor = $IPSet_Descriptor
+
+        Update-WAFRIPSet -ChangeToken (Get-WAFRChangeToken) -IPSetId $Ipset_ID -Update $IPSet_setUpdate
+
+    }
 
     
-    #Blocks Traffic from specified country
+    #Creating Rules
 
-    $GeoMatchset_ID = (New-WAFGeoMatchSet -ChangeToken (Get-WAFChangeToken) -Name $GeoMatch_Name).GeoMatchSet.GeoMatchSetId
+    $Rule_ID1 = (New-WAFRRule -ChangeToken (Get-WAFRChangeToken) -Name $Rule_Location -metricName $Rule_Location).Rule.RuleId
 
-    $GeoMatch_Constraint = New-Object -TypeName Amazon.WAF.Model.GeoMatchConstraint
+    $Rule_ID2 = (New-WAFRRule -ChangeToken (Get-WAFRChangeToken) -Name $Rule_Ip -metricName $Rule_Ip).Rule.RuleId
 
-    $GeoMatch_Constraint.Type = "Country"
+    $Rule_predicates1 = New-Object -TypeName Amazon.WAFRegional.Model.Predicate
 
-    $GeoMatch_Constraint.Value = $GeoMatch_country_blocked
-
-    $GeoMatch_Setupdate = New-Object -TypeName Amazon.WAF.Model.GeoMatchSetUpdate
-
-    $GeoMatch_Setupdate.Action = "Insert"
-
-    $GeoMatch_Setupdate.GeoMatchConstraint = $GeoMatch_Constraint
-
-    Update-WAFGeoMatchSet -ChangeToken (Get-WAFChangeToken) -GeoMatchSetId $GeoMatchset_ID -Update $GeoMatch_Setupdate
-
-
-
-    #Blocks Traffic from specified Id
-
-    $Ipset_ID = (New-WAFIPSet -ChangeToken (Get-WAFChangeToken) -Name $Ip_Name).IPSet.IPSetId
-
-    $IPSet_Descriptor = New-Object -TypeName Amazon.WAF.Model.IPSetDescriptor
-
-    $IPSet_Descriptor.Type = "IPV4"
-
-    $IPSet_Descriptor.Value = $ip_blocked
-
-    $IPSet_setUpdate = New-Object -TypeName Amazon.WAF.Model.IPSetUpdate
-
-    $IPSet_setUpdate.Action = "Insert"
-
-    $IPSet_setUpdate.IPSetDescriptor = $IPSet_Descriptor
-
-    Update-WAFIPSet -ChangeToken (Get-WAFChangeToken) -IPSetId $Ipset_ID -Update $IPSet_setUpdate
-
-    #Create a rule for the web ACL
-
-    $Rule_ID1 = (New-WAFRule -ChangeToken (Get-WAFChangeToken) -Name $Rule_Location -metricName $Rule_Location).Rule.RuleId
-
-    $Rule_ID2 = (New-WAFRule -ChangeToken (Get-WAFChangeToken) -Name $Rule_Ip -metricName $Rule_Ip).Rule.RuleId
-
-    $Rule_predicates1 = New-Object -TypeName Amazon.WAF.Model.Predicate
-
-    $Rule_predicates2 = New-Object -TypeName Amazon.WAF.Model.Predicate
+    $Rule_predicates2 = New-Object -TypeName Amazon.WAFRegional.Model.Predicate
 
     $Rule_predicates1.Type = "GeoMatch"
 
@@ -94,31 +128,33 @@
 
     $Rule_predicates2.Negated = "False"
 
-    $Rule_setUpdate1 = New-Object -TypeName Amazon.WAF.Model.RuleUpdate
+    $Rule_setUpdate1 = New-Object -TypeName Amazon.WAFRegional.Model.RuleUpdate
 
     $Rule_setUpdate1.Action = "Insert"
 
     $Rule_setUpdate1.Predicate = $Rule_predicates1
 
-    Update-WAFRule -RuleId $Rule_ID1 -ChangeToken (Get-WAFChangeToken) -Update $Rule_setUpdate1
+    Update-WAFRRule -RuleId $Rule_ID1 -ChangeToken (Get-WAFRChangeToken) -Update $Rule_setUpdate1
 
-    $Rule_setUpdate2 = New-Object -TypeName Amazon.WAF.Model.RuleUpdate
+    $Rule_setUpdate2 = New-Object -TypeName Amazon.WAFRegional.Model.RuleUpdate
 
     $Rule_setUpdate2.Action = "Insert"
 
     $Rule_setUpdate2.Predicate = $Rule_predicates2
 
-    Update-WAFRule -RuleId $Rule_ID2 -ChangeToken (Get-WAFChangeToken) -Update $Rule_setUpdate2
+    Update-WAFRRule -RuleId $Rule_ID2 -ChangeToken (Get-WAFRChangeToken) -Update $Rule_setUpdate2
 
-    #Create a WebACL
+    
+    
+    #Creating WebACL
+    
+    $WAFACL_ID = (New-WAFRWebACL -ChangeToken (Get-WAFRChangeToken) -DefaultAction_Type Allow -MetricName $WebACL_Name -Name $WebACL_Name ).WebACL.WebACLId
 
-    $WAFACL_ID = (New-WAFWebACL -ChangeToken (Get-WAFChangeToken) -DefaultAction_Type Allow -MetricName $WebACL_Name -Name $WebACL_Name).WebACL.WebACLId
-
-    $Action_Allow = New-Object -TypeName Amazon.WAF.Model.WafAction
+    $Action_Allow = New-Object -TypeName Amazon.WAFRegional.Model.WafAction
 
     $Action_Allow.Type = "ALLOW"
 
-    $Rule1 = New-Object -TypeName Amazon.WAF.Model.ActivatedRule
+    $Rule1 = New-Object -TypeName Amazon.WAFRegional.Model.ActivatedRule
     
     $Rule1.Action = $Action_Allow
 
@@ -128,7 +164,7 @@
 
     $Rule1.Type = "REGULAR"
 
-    $Rule2 = New-Object -TypeName Amazon.WAF.Model.ActivatedRule
+    $Rule2 = New-Object -TypeName Amazon.WAFRegional.Model.ActivatedRule
     
     $Rule2.Action = $Action_Allow
 
@@ -137,21 +173,22 @@
     $Rule2.RuleId = $Rule_ID2
 
     $Rule2.Type = "REGULAR"
-
-    $WebACL_setupdate1 = New-Object -TypeName Amazon.WAF.Model.WebACLUpdate
+        
+    $WebACL_setupdate1 = New-Object -TypeName Amazon.WAFRegional.Model.WebACLUpdate
 	
-    $WebACL_setupdate1.Action = "Insert"
+	$WebACL_setupdate1.Action = "Insert"
 
     $WebACL_setupdate1.ActivatedRule = $Rule1
         
-    $WebACL_setupdate2 = New-Object -TypeName Amazon.WAF.Model.WebACLUpdate
+    $WebACL_setupdate2 = New-Object -TypeName Amazon.WAFRegional.Model.WebACLUpdate
 
-    $WebACL_setupdate2.Action = "Insert"
+	$WebACL_setupdate2.Action = "Insert"
 
     $WebACL_setupdate2.ActivatedRule = $Rule2
 
-    Update-WAFWebACL -ChangeToken (Get-WAFChangeToken) -Update $WebACL_setupdate1 -WebACLId $WAFACL_ID
+	Update-WAFRWebACL -ChangeToken (Get-WAFRChangeToken) -Update $WebACL_setupdate1 -WebACLId $WAFACL_ID
 
-    Update-WAFWebACL -ChangeToken (Get-WAFChangeToken) -Update $WebACL_setupdate2 -WebACLId $WAFACL_ID
-    
+    Update-WAFRWebACL -ChangeToken (Get-WAFRChangeToken) -Update $WebACL_setupdate2 -WebACLId $WAFACL_ID
+
 }
+
