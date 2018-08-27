@@ -1,13 +1,15 @@
-﻿$Region = 
-$instances_id = 
-$AZ =
-$Access_Key = 
-$Secret_Key = 
-$Profile_Name =
-$volume_Type =
+$Access_Key = 'AKIA*************'  
+$Secret_Key = 'TZc4******************'
 
-#Set-AWSCredentials -StoreAs $Keys -AccessKey $Access_Key  -SecretKey $Secret_Key
-#Initialize-AWSDefaultConfiguration -ProfileName $Profile_Name -Region $Region
+$instances_id = 'i-0e96*********'
+$Region =  'us-west-2'
+$AZ = 'us-west-2a'
+
+$Profile_Name = 'Testing'
+$volume_Type = 'gp2'
+
+Set-AWSCredentials -StoreAs $Profile_Name -AccessKey $Access_Key  -SecretKey $Secret_Key
+Initialize-AWSDefaultConfiguration -ProfileName $Profile_Name -Region $Region
 #Stop the instance specified.
 Stop-EC2Instance -InstanceId $instances_id
 #wait untill the instance is stopped.
@@ -22,7 +24,7 @@ if($instances_id -eq $Volumes.Attachment.InstanceId){
 #Get the device name.
 $Volume_Device = $Volumes.Attachment.Device
 #Create a snapshot from volume.
-$Snapshot_Id = New-EC2Snapshot -VolumeId $Volumes.VolumeId -Description "This is a Encrypted snapshot"
+$Snapshot_Id = New-EC2Snapshot -VolumeId $Volumes.VolumeId -Description "This is a Not Encrypted snapshot"
 #Wait till snap shot is available.
 While((Get-EC2Snapshot -SnapshotId $Snapshot_Id.SnapshotId).Status.Value -ne 'completed'){ 
     Start-Sleep -s 10
@@ -45,5 +47,8 @@ Start-Sleep -s 10
 $NEw_Attached_Volume = Add-EC2Volume -InstanceId $instances_id -VolumeId $encrypted_volume_id.VolumeId -Device $Volumes.Attachment.Device
 
 
+
 }
 }
+
+Start-EC2Instance -InstanceId $instances_id
